@@ -14,7 +14,7 @@ module ActiveLdap
       super
       base.extend(ClassMethods)
       base.class_attribute(:associations)
-      base.associations ||= []
+      base.associations = []
     end
 
     module ClassMethods
@@ -37,9 +37,7 @@ module ActiveLdap
       # Example:
       #  belongs_to :groups, :class_name => "Group",
       #             :many => "memberUid" # Group#memberUid
-      #             # :primary_key => "uid" # User#uid
-      #             ## deprecated since 1.1.0. Use :primary_key instead.
-      #             ## :foreign_key => "uid" # User#uid
+      #             # :foreign_key => "uid" # User#uid
       #             # dn attribute value is used by default
       #  belongs_to :primary_group, :class_name => "Group",
       #             :foreign_key => "gidNumber", # User#gidNumber
@@ -63,14 +61,7 @@ module ActiveLdap
         }
         if opts[:many]
           association_class = Association::BelongsToMany
-          foreign_key_name = opts[:foreign_key_name]
-          if foreign_key_name
-            message = _(":foreign_key belongs_to(:many) option is " \
-                        "deprecated since 1.1.0. Use :primary_key instead.")
-            ActiveSupport::Deprecation.warn(message)
-            opts[:primary_key_name] ||= foreign_key_name
-          end
-          opts[:primary_key_name] ||= dn_attribute
+          opts[:foreign_key_name] ||= dn_attribute
         else
           association_class = Association::BelongsTo
           opts[:foreign_key_name] ||= "#{association_id}_id"
@@ -101,19 +92,15 @@ module ActiveLdap
       #
       # Example:
       #   has_many :primary_members, :class_name => "User",
-      #            :primary_key => "gidNumber", # Group#gidNumber
-      #            :foreign_key => "gidNumber"  # User#gidNumber
-      #            ## deprecated since 1.1.0. Those options
-      #            ## are inverted.
-      #            # :primary_key => "gidNumber", # User#gidNumber
-      #            # :foreign_key => "gidNumber"  # Group#gidNumber
+      #            :primary_key => "gidNumber", # User#gidNumber
+      #            :foreign_key => "gidNumber"  # Group#gidNumber
       #   has_many :members, :class_name => "User",
       #            :wrap => "memberUid" # Group#memberUid
       def has_many(association_id, options = {})
         validate_has_many_options(options)
         klass = options[:class]
         klass ||= (options[:class_name] || association_id.to_s).classify
-        foreign_key = options[:foreign_key]
+        foreign_key = options[:foreign_key] || "#{association_id}_id"
         primary_key = options[:primary_key]
         set_associated_class(association_id, klass)
 
@@ -128,17 +115,6 @@ module ActiveLdap
           association_class = Association::HasManyWrap
         else
           association_class = Association::HasMany
-          primary_key_name = opts[:primary_key_name]
-          foreign_key_name = opts[:foreign_key_name]
-          if primary_key_name != foreign_key_name and
-              primary_key_name != "dn" and
-              !new.have_attribute?(primary_key_name)
-            message = _(":primary_key and :foreign_key has_many options are " \
-                        "inverted their mean since 1.1.0. Please invert them.")
-            ActiveSupport::Deprecation.warn(message)
-            opts[:foreign_key_name] = primary_key_name
-            opts[:primary_key_name] = foreign_key_name
-          end
         end
 
         association_accessor(association_id) do |target|
@@ -197,9 +173,5 @@ module ActiveLdap
         instance_variable_set("@#{association}", nil)
       end
     end
-  end
-
-  module Association
-    autoload :Children, 'active_ldap/association/children'
   end
 end
